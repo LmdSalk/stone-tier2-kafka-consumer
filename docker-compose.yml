@@ -1,0 +1,71 @@
+version: "3.8"
+
+services:
+  zookeeper:
+    image: bitnami/zookeeper:3.8
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    # Sem portas expostas para evitar conflitos
+    networks: [tier2net]
+
+  kafka:
+    image: bitnami/kafka:3.6
+    depends_on:
+      - zookeeper
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+    networks: [tier2net]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.1
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    # Por padrão NÃO expomos 9200 para evitar conflitos.
+    # Se quiser testar a partir do host, descomente abaixo:
+    # ports:
+    #   - "9200:9200"
+    networks: [tier2net]
+
+  # Cria o tópico "transactions" (idempotente).
+  topic-init:
+    image: bitnami/kafka:3.6
+    depends_on:
+      - kafka
+    networks: [tier2net]
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      "/opt/bitnami/kafka/bin/kafka-topics.sh
+       --bootstrap-server kafka:9092
+       --create --if-not-exists
+       --topic transactions
+       --partitions 1 --replication-factor 1 &&
+       sleep 2"
+
+  consumer:
+    build:
+      context: ./consumer
+      dockerfile: Dockerfile
+    depends_on:
+      - kafka
+      - elasticsearch
+      - topic-init
+    environment:
+      - BOOTSTRAP_SERVERS=kafka:9092
+      - TOPIC=transactions
+      - GROUP_ID=stone-tier2-consumer
+      - ES_URL=http://elasticsearch:9200
+      - BULK_SIZE=1000
+      - AUTO_OFFSET_RESET=earliest
+    networks: [tier2net]
+    # Mostra logs no terminal
+    tty: true
+
+networks:
+  tier2net:
+    driver: bridge

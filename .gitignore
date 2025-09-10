@@ -1,0 +1,20 @@
+﻿# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+
+# Docker
+*.log
+*.pid
+
+# VSCode/IDE
+.vscode/
+.idea/
+
+# SO
+.DS_Store
+Thumbs.db
