@@ -1,4 +1,3 @@
-@"
 # Stone – Tier 2: Kafka Consumer -> Elasticsearch
 
 Consumidor que lê eventos do Kafka (tópico `transactions`) e indexa no Elasticsearch no índice/alias `transactions`.
